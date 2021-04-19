@@ -1,0 +1,97 @@
+---
+- hosts: aws_workers
+  become: true
+
+  tasks:
+
+   - name: add docker repository
+     shell: yum config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
+     args:
+       creates: /etc/yum.repos.d/docker_repo.repo
+
+   - name: install packeges
+     yum:
+      name: ['docker-ce', 'python3-pip']
+      state: present
+
+   - name: install docker-py
+     pip:
+      name: docker-py
+
+   - name: start docker
+     service:
+      name: docker
+      state: started
+      enabled: true
+
+
+- hosts: localhost
+  become: true
+
+  tasks:
+
+  - name: docker login
+    docker_login:
+      username: heliamihay
+      password: Heli312476
+      email: heli.yosefi@gmail.com
+
+  - name: build image
+    docker_image:
+      build:
+        path: /project/docker
+      force: yes
+      name: flaskserver
+      repository: heliamihay/rhassignment:flaskserver
+      push: yes
+      source: build
+
+
+- hosts: aws_workers
+  become: true
+
+  tasks:
+
+  - name: run container
+    docker_container:
+      name: flaskserver
+      image: heliamihay/rhassignment:flaskserver
+      state: started
+      detach: yes
+      interactive: yes
+      command: sleep infinity
+
+
+- hosts: haproxy
+  become: true
+
+  tasks:
+    - name: install haproxy
+      yum:
+       name: haproxy
+       state: present
+
+    - name: remove old server from configuration
+      lineinfile:
+       path: /etc/haproxy/haproxy.cfg
+       state: absent
+       regexp: '^    server  app'
+
+    - name: add server to configuration
+      blockinfile:
+       path: /etc/haproxy/haproxy.cfg
+       block: |
+        server  app1 18.221.21.87:5000 check
+        server  app2 3.136.108.238:5000 check
+        server  app3 3.140.253.46:5000 check
+
+    - name: bind port 80
+      replace:
+       path: /etc/haproxy/haproxy.cfg
+       regexp: '^    bind *:5000'
+       replace: '    bind *80:'
+
+    - name: start haproxy
+      service:
+       name: haproxy
+       state: started
