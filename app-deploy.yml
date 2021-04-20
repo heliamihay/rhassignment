@@ -70,7 +70,7 @@
       yum:
        name: haproxy
        state: present
-
+       
     - name: remove old server from configuration
       lineinfile:
        path: /etc/haproxy/haproxy.cfg
@@ -95,3 +95,4 @@
       service:
        name: haproxy
        state: started
+       enabled: true
